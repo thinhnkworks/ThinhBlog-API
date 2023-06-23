@@ -12,5 +12,11 @@ namespace ThinhBlogAPI.Controllers
 		{
 			return "these are so many posts";
 		}
+
+		[HttpGet("{id:int}", Name = "GetPostByID")]
+		public string Get(int id)
+		{
+			return "this is post by id" + id.ToString();
+		}
 	}
 }
