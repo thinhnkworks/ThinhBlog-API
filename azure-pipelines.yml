@@ -1,0 +1,80 @@
+# ASP.NET Core
+# Build and test ASP.NET Core projects targeting .NET Core.
+# Add steps that run tests, create a NuGet package, deploy, and more:
+# https://docs.microsoft.com/azure/devops/pipelines/languages/dotnet-core
+
+name: "Testing-Pipeline"
+
+trigger:
+  branches:
+   include:
+     - master
+     - development
+
+pool:
+  vmImage: windows-latest
+
+variables:
+  - name: "BuildParameters.RestoreBuildProjects"
+    value: "**/*.csproj"
+  - name: "BuildConfiguration"
+    value: "Release"
+
+stages:
+
+  - stage: "AppTestInitialization"
+    jobs:
+      - job: "CreateWebApp"
+        steps:
+        - task: AzureWebApp@1
+          inputs:
+            azureSubscription: 'Azure - Kilatus Tenant - Interactive'
+            appType: 'webApp'
+            appName: 'service-thinhblog-test'
+            package: '$(System.DefaultWorkingDirectory)/**/*.zip'
+            configurationStrings: |
+              $(KeyVaultConfig:KeyVaultURL-Dev)
+              $(KeyVaultConfig:TenantID)
+              $(KeyVaultConfig:ClientID)
+              $(KeyVaultConfig:ClientSecret)
+            deploymentMethod: 'auto'
+
+  - stage: "BuildStage"
+    jobs: 
+      - job: "Restore"
+        steps:
+        - task: DotNetCoreCLI@2
+          inputs:
+            command: 'restore'
+            projects: $(BuildParameters.RestoreBuildProjects)
+            feedsToUse: 'select'
+      - job: "Build"
+        steps:
+        - task: DotNetCoreCLI@2
+          inputs:
+            command: 'build'
+            projects: $(BuildParameters.RestoreBuildProjects)
+            arguments: --configuration $(BuildConfiguration)
+
+  - stage: "PublishStage"
+    jobs: 
+      - job: "Publish"
+        steps:
+        - task: DotNetCoreCLI@2
+          inputs:
+            command: 'publish'
+            publishWebProjects: true
+            arguments: '--configuration $(BuildConfiguration) --output $(Build.ArtifactStagingDirectory)'
+            zipAfterPublish: true
+
+  - stage: "PublishArtifactStage"
+    jobs: 
+    - job: "PublishArtifact"
+      steps:
+      - task: PublishBuildArtifacts@1
+        inputs:
+          PathtoPublish: '$(Build.ArtifactStagingDirectory)'
+          ArtifactName: 'drop'
+          publishLocation: 'Container'
+          
+...
